@@ -1,0 +1,475 @@
+{% extends 'base.html' %}
+{% block title %}Quản lý Hoạt động{% endblock %}
+{% block page_title %}QUẢN LÝ HOẠT ĐỘNG - SỰ KIỆN{% endblock %}
+{% block page_subtitle %}Tạo hoạt động, phân công phụ trách và ghi nhận sinh viên tham gia.{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <form class="flex items-center gap-2 flex-wrap" method="GET" action="/hoat-dong">
+            <input type="text" name="search_query" class="form-control search-input" placeholder="Tìm tên hoặc mã hoạt động..." value="{{ search_query }}">
+            <select name="loai_filter" class="form-control filter-select">
+                <option value="">-- Tất cả loại --</option>
+                {% for l in loai_hd_list %}
+                    <option value="{{ l.MaLoaiHD }}" {% if loai_filter == l.MaLoaiHD %}selected{% endif %}>{{ l.TenLoaiHD }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary">🔍 Lọc</button>
+            {% if search_query or loai_filter %}
+                <a href="/hoat-dong" class="btn btn-secondary">❌ Bỏ lọc</a>
+            {% endif %}
+        </form>
+    </div>
+    <div class="toolbar-right">
+        <a href="/export/hoat-dong" class="btn btn-success">📥 Xuất Excel</a>
+        {% if session.get('role') in ['admin', 'bch'] %}
+        <button class="btn btn-primary" onclick="openAddModal()">➕ Tạo hoạt động</button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="activity-grid">
+    {% for hd in hoatdong_list %}
+    <div class="activity-card">
+        <div class="ac-head">
+            <h4>{{ hd.TenHD }}</h4>
+            <span class="ac-code">{{ hd.MaHD }} · <span class="badge badge-gray">{{ hd.TenLoaiHD }}</span></span>
+        </div>
+        <div class="ac-body">
+            <div class="ac-row">
+                <span class="ac-label">Thời gian</span>
+                <span class="ac-value">{{ hd.NgayBatDau }} → {{ hd.NgayKetThuc }}</span>
+            </div>
+            <div class="ac-row">
+                <span class="ac-label">Điểm ĐRL</span>
+                <span class="ac-value" style="color:var(--success);">+{{ hd.DiemCong }}</span>
+            </div>
+            <div class="ac-row">
+                <span class="ac-label">Học kỳ</span>
+                <span class="ac-value">{{ hd.HocKy }} ({{ hd.NamHoc }})</span>
+            </div>
+            <div class="ac-row">
+                <span class="ac-label">Phụ trách</span>
+                <span class="ac-value">
+                    {% if hd.BCH_MaSV %}{{ hd.HoLotSV }} {{ hd.TenSV }}
+                    {% elif hd.TenGiaoVien %}{{ hd.TenGiaoVien }}
+                    {% else %}<span class="text-muted">—</span>{% endif %}
+                </span>
+            </div>
+            <div class="ac-row">
+                <span class="ac-label">SV tham gia</span>
+                <span class="ac-value">
+                    <button class="btn btn-sm btn-info" onclick="openDetailModal('{{ hd.MaHD }}', '{{ hd.TenHD }}')">
+                        {{ sv_tham_gia_dict.get(hd.MaHD, [])|length }} SV
+                    </button>
+                </span>
+            </div>
+            <div id="ds_sv_{{ hd.MaHD }}" style="display:none;">
+                <table class="modern-table" style="font-size:12px;margin:0;">
+                    <thead><tr style="background:#f1f5f9;"><th>Mã SV</th><th>Họ Tên</th><th>Lớp</th><th>Trạng thái</th><th>MC</th><th>Thời gian</th></tr></thead>
+                    <tbody>
+                        {% for sv in sv_tham_gia_dict.get(hd.MaHD, []) %}
+                        <tr>
+                            <td>{{ sv.MaSV }}</td><td>{{ sv.HoTen }}</td><td>{{ sv.TenLop }}</td>
+                            <td><span class="badge {% if sv.TrangThaiThamGia == 'Đã duyệt' or sv.TrangThaiThamGia == 'Đã tham gia' %}badge-green{% elif sv.TrangThaiThamGia == 'Không tham gia' %}badge-danger{% else %}badge-warning{% endif %}" style="font-size:11px;">{{ sv.TrangThaiThamGia }}</span></td>
+                            <td>{% if sv.MinhChung %}<a href="{{ url_for('static', filename='uploads/' + sv.MinhChung) }}" target="_blank" style="font-size:18px;">📷</a>{% else %}<span class="text-muted" style="font-size:11px;">—</span>{% endif %}</td>
+                            <td style="font-size:11px;color:#64748b;">{% if sv.NgayDiemDanh %}{{ sv.NgayDiemDanh.strftime('%H:%M %d/%m') if sv.NgayDiemDanh is not string else sv.NgayDiemDanh }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="6" class="text-center text-muted">Chưa có SV tham gia.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="ac-foot">
+            {% if session.get('role') in ['admin', 'bch'] %}
+                <button class="btn btn-sm btn-warning" onclick="openDiemDanhModal('{{ hd.MaHD }}', '{{ hd.TenHD }}')">📋 Điểm danh</button>
+                <button class="btn btn-sm btn-info" onclick="window.open('/generate-qr/{{ hd.MaHD }}', '_blank', 'width=500,height=650')">📱 QR</button>
+                <button class="btn btn-sm btn-success" onclick="openAddStudentModal('{{ hd.MaHD }}', '{{ hd.TenHD }}')">👥 Thêm SV</button>
+                <button class="btn btn-sm btn-primary"
+                    data-mahd="{{ hd.MaHD }}" data-tenhd="{{ hd.TenHD }}"
+                    data-maloaihd="{{ hd.MaLoaiHD }}" data-ngaybd="{{ hd.NgayBatDau }}"
+                    data-ngaykt="{{ hd.NgayKetThuc }}" data-diemcong="{{ hd.DiemCong }}"
+                    data-mabch="{{ hd.MaBCH if hd.MaBCH else '' }}" data-hocky="{{ hd.HocKy if hd.HocKy else '' }}"
+                    data-namhoc="{{ hd.NamHoc if hd.NamHoc else '' }}" onclick="openEditModal(this)">✏️ Sửa</button>
+                <button class="btn btn-sm btn-danger" onclick="openDeleteModal('{{ hd.MaHD }}')">🗑️ Xóa</button>
+            {% elif session.get('role') == 'sinhvien' and session.get('masv') %}
+                {% if hd.MaHD in my_regs %}
+                    <span class="badge badge-green">✅ Đã tham gia</span>
+                    <button class="btn btn-sm btn-info" onclick="openQRScanner()" style="font-size:11px;padding:4px 10px;">📷 Quét QR</button>
+                {% else %}
+                    <a href="/tu-dang-ky-hoat-dong/{{ hd.MaHD }}" class="btn btn-sm btn-success" onclick="return confirm('Xác nhận đăng ký tham gia hoạt động này?')">📝 Đăng ký</a>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state" style="grid-column:1/-1;">
+        <div class="empty-icon">📅</div>
+        <h4>Chưa có hoạt động nào</h4>
+        <p>Hãy tạo hoạt động đầu tiên cho kỳ học này.</p>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Modal Tạo/Sửa Hoạt động -->
+<div id="hoatdongModal" class="modal-overlay">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <h3 id="modal_title">Tạo Hoạt động Mới</h3>
+            <button class="close-btn" onclick="closeModal('hoatdongModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="hoatdongForm" method="POST" action="/luu-hoat-dong">
+                <input type="hidden" id="form_action" name="action" value="add">
+                <div class="grid-form">
+                    <div class="form-group"><label>Mã hoạt động</label><input type="text" id="modal_MaHD" name="MaHD" required></div>
+                    <div class="form-group">
+                        <label>Loại hoạt động</label>
+                        <select name="MaLoaiHD" id="modal_MaLoaiHD" required>
+                            {% for l in loai_hd_list %}<option value="{{ l.MaLoaiHD }}">{{ l.TenLoaiHD }}</option>{% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group full-width"><label>Tên hoạt động</label><input type="text" id="modal_TenHD" name="TenHD" required></div>
+                <div class="grid-form">
+                    <div class="form-group"><label>Ngày bắt đầu</label><input type="date" id="modal_NgayBatDau" name="NgayBatDau" required></div>
+                    <div class="form-group"><label>Ngày kết thúc</label><input type="date" id="modal_NgayKetThuc" name="NgayKetThuc" required></div>
+                </div>
+                <div class="grid-form">
+                    <div class="form-group">
+                        <label>Học kỳ</label>
+                        <select name="HocKy" id="modal_HocKy" required>
+                            <option value="HK1">HK1</option>
+                            <option value="HK2" selected>HK2</option>
+                            <option value="HK3">HK3</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Năm học</label>
+                        <input type="text" name="NamHoc" id="modal_NamHoc" placeholder="VD: 2025-2026" required>
+                    </div>
+                </div>
+                <div class="grid-form">
+                    <div class="form-group"><label>Điểm cộng ĐRL</label><input type="number" id="modal_DiemCong" name="DiemCong" required></div>
+                    <div class="form-group">
+                        <label>Người phụ trách</label>
+                        <select name="MaBCH" id="modal_MaBCH">
+                            <option value="">-- Chọn --</option>
+                            {% for b in bch_list %}
+                                <option value="{{ b.MaBCH }}">
+                                    {% if b.TenSV %}{{ b.HoLotSV }} {{ b.TenSV }}{% elif b.TenGiaoVien %}{{ b.TenGiaoVien }}{% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between" style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('hoatdongModal')">Hủy</button>
+                    <button type="submit" class="btn btn-primary">💾 Lưu hoạt động</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Chi tiết SV tham gia -->
+<div id="detailModal" class="modal-overlay">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <h3>SV tham gia: <span id="detail_TenHD" style="color:var(--primary);"></span></h3>
+            <button class="close-btn" onclick="closeModal('detailModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="detail_Content" style="max-height:400px;overflow-y:auto;"></div>
+            <div class="flex justify-between" style="margin-top:16px;">
+                <button class="btn btn-secondary" onclick="closeModal('detailModal')">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Điểm danh -->
+<div id="diemDanhModal" class="modal-overlay">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <h3>📋 Điểm danh: <span id="dd_TenHD" style="color:var(--warning);"></span></h3>
+            <button class="close-btn" onclick="closeModal('diemDanhModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="diemDanhForm" method="POST" action="/diem-danh-hoat-dong">
+                <input type="hidden" id="dd_MaHD" name="MaHD" value="">
+                <input type="hidden" id="dd_data" name="ds_diem_danh" value="">
+                <div style="background:#f8fafc;padding:16px;border-radius:var(--radius-sm);border:1px solid var(--border);">
+                    <p style="color:var(--text-muted);margin-bottom:12px;">👆 <strong>Click vào trạng thái</strong> từng SV để chọn <strong>"Đã tham gia"</strong> (cộng +ĐRL) hoặc <strong>"Không tham gia"</strong> (không cộng).</p>
+                    <div class="student-list-wrap">
+                        <table class="modern-table">
+                            <thead>
+                                <tr>
+                                    <th>Mã SV</th><th>Họ Tên</th><th>Lớp</th><th>Trạng thái</th><th>MC</th><th>TG</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dd_student_list"></tbody>
+                        </table>
+                    </div>
+                    <div class="flex items-center justify-between" style="margin-top:16px;">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('diemDanhModal')">Hủy</button>
+                        <button type="submit" class="btn btn-warning">✅ Ghi nhận điểm danh</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Popup chọn trạng thái điểm danh -->
+<div id="ddStatusPopup" class="dd-popup" style="display:none;position:fixed;z-index:9999;background:#fff;border-radius:var(--radius);box-shadow:0 8px 30px rgba(0,0,0,0.2);padding:6px;min-width:200px;overflow:hidden;">
+    <div onclick="chonTrangThai('DaThamGia')" style="padding:10px 16px;cursor:pointer;border-radius:var(--radius-sm);font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px;color:#166534;" onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background=''">✅ Đã tham gia</div>
+    <div onclick="chonTrangThai('KhongThamGia')" style="padding:10px 16px;cursor:pointer;border-radius:var(--radius-sm);font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px;color:#991b1b;" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background=''">❌ Không tham gia</div>
+</div>
+<input type="hidden" id="dd_popup_masv" value="">
+
+<style>
+.dd-popup-anchor { position:relative; }
+</style>
+
+<!-- Modal Thêm SV tham gia -->
+<div id="addStudentModal" class="modal-overlay">
+    <div class="modal-content modal-xl">
+        <div class="modal-header">
+            <h3>Thêm SV tham gia: <span id="display_TenHD" style="color:var(--success);"></span></h3>
+            <button class="close-btn" onclick="closeModal('addStudentModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="addStudentForm" method="POST" action="/luu-sv-tham-gia">
+                <input type="hidden" id="modal_Student_MaHD" name="MaHD" value="">
+                <div style="background:#f8fafc;padding:16px;border-radius:var(--radius-sm);border:1px solid var(--border);">
+                    <div style="display:flex;gap:10px;margin-bottom:12px;">
+                        <input type="text" id="filterInput" class="form-control" onkeyup="filterStudents()" placeholder="Tìm nhanh theo Lớp hoặc Tên..." style="flex:1;">
+                    </div>
+                    <div class="student-list-wrap">
+                        <table class="modern-table">
+                            <thead>
+                                <tr><th style="width:50px;text-align:center;"><input type="checkbox" onclick="toggleAll(this)"></th><th>Mã SV</th><th>Họ Tên</th><th>Lớp</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for sv in all_students %}
+                                <tr class="sv-row">
+                                    <td style="text-align:center;"><input type="checkbox" name="chon_sv" value="{{ sv.MaSV }}" class="sv-checkbox"></td>
+                                    <td><span class="badge badge-gray">{{ sv.MaSV }}</span></td>
+                                    <td><strong>{{ sv.HoLotSV }} {{ sv.TenSV }}</strong></td>
+                                    <td>{{ sv.TenLop }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="flex items-center justify-between" style="margin-top:16px;">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('addStudentModal')">Hủy</button>
+                        <button type="submit" class="btn btn-success">Ghi nhận</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xóa -->
+<div id="deleteModal" class="modal-overlay">
+    <div class="modal-content modal-sm text-center">
+        <div class="modal-body" style="padding:40px;">
+            <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+            <h3 style="margin-bottom:8px;">Xác nhận xóa?</h3>
+            <p style="color:var(--text-muted);font-size:13px;">Điểm rèn luyện đã cộng sẽ không bị mất.</p>
+        </div>
+        <div class="modal-footer" style="display:flex;gap:12px;justify-content:center;padding:0 24px 24px;">
+            <button class="btn btn-secondary" onclick="closeModal('deleteModal')">Hủy</button>
+            <a href="#" id="confirmDeleteBtn" class="btn btn-danger">Xóa</a>
+        </div>
+    </div>
+</div>
+
+<script>
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+function openAddModal() {
+    document.getElementById('form_action').value = 'add';
+    document.getElementById('modal_title').innerText = 'Tạo Hoạt động Mới';
+    document.getElementById('modal_MaHD').readOnly = false;
+    document.getElementById('hoatdongForm').reset();
+    document.getElementById('modal_HocKy').value = 'HK2';
+    document.getElementById('modal_NamHoc').value = '2025-2026';
+    openModal('hoatdongModal');
+}
+
+function openEditModal(btn) {
+    document.getElementById('form_action').value = 'edit';
+    document.getElementById('modal_title').innerText = 'Sửa Hoạt động';
+    document.getElementById('modal_MaHD').value = btn.getAttribute('data-mahd');
+    document.getElementById('modal_MaHD').readOnly = true;
+    document.getElementById('modal_TenHD').value = btn.getAttribute('data-tenhd');
+    document.getElementById('modal_MaLoaiHD').value = btn.getAttribute('data-maloaihd');
+    document.getElementById('modal_NgayBatDau').value = btn.getAttribute('data-ngaybd');
+    document.getElementById('modal_NgayKetThuc').value = btn.getAttribute('data-ngaykt');
+    document.getElementById('modal_DiemCong').value = btn.getAttribute('data-diemcong');
+    var maBCH = btn.getAttribute('data-mabch');
+    document.getElementById('modal_MaBCH').value = maBCH && maBCH !== 'None' ? maBCH : '';
+    document.getElementById('modal_HocKy').value = btn.getAttribute('data-hocky') || 'HK2';
+    document.getElementById('modal_NamHoc').value = btn.getAttribute('data-namhoc') || '2025-2026';
+    openModal('hoatdongModal');
+}
+
+function openDeleteModal(ma_hd) {
+    document.getElementById('confirmDeleteBtn').href = '/xoa-hoat-dong/' + ma_hd;
+    openModal('deleteModal');
+}
+
+function openDiemDanhModal(maHD, tenHD) {
+    document.getElementById('dd_TenHD').innerText = tenHD;
+    document.getElementById('dd_MaHD').value = maHD;
+    var tbody = document.getElementById('dd_student_list');
+    tbody.innerHTML = '';
+    var hiddenTable = document.getElementById('ds_sv_' + maHD);
+    if (hiddenTable) {
+        var rows = hiddenTable.querySelectorAll('tbody tr');
+        rows.forEach(function(row) {
+            var cells = row.querySelectorAll('td');
+            if (cells.length < 4) return;
+            var maSV = cells[0].innerText.trim();
+            var hoTen = cells[1].innerText.trim();
+            var lop = cells[2].innerText.trim();
+            var trangThai = cells[3].innerText.trim();
+            var mcHtml = cells.length > 4 ? cells[4].innerHTML.trim() : '';
+            var timeHtml = cells.length > 5 ? cells[5].innerText.trim() : '';
+            // Xác định trạng thái ban đầu
+            var initStatus = 'DangCho';
+            var initLabel = '⏳ Đang chờ điểm danh';
+            var initBg = '#fef3c7'; var initColor = '#92400e';
+            if (trangThai === 'Đã tham gia' || trangThai === 'Đã duyệt') {
+                initStatus = 'DaThamGia';
+                initLabel = '✅ Đã tham gia';
+                initBg = '#dcfce7'; initColor = '#166534';
+            } else if (trangThai === 'Không tham gia') {
+                initStatus = 'KhongThamGia';
+                initLabel = '❌ Không tham gia';
+                initBg = '#fee2e2'; initColor = '#991b1b';
+            }
+            var tr = document.createElement('tr');
+            tr.setAttribute('data-status', initStatus);
+            tr.innerHTML =
+                '<td><span class="badge badge-gray">' + maSV + '</span></td>' +
+                '<td><strong>' + hoTen + '</strong></td>' +
+                '<td>' + lop + '</td>' +
+                '<td><span class="dd-status-badge" data-masv="' + maSV + '" onclick="event.stopPropagation();hienThiPopup(this)" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:5px 16px;border-radius:20px;font-size:12px;font-weight:600;background:' + initBg + ';color:' + initColor + ';border:2px solid transparent;transition:0.15s;" onmouseover="this.style.borderColor=\'#cbd5e1\'" onmouseout="this.style.borderColor=\'transparent\'">' + initLabel + ' ▾</span></td>' +
+                '<td style="text-align:center;">' + mcHtml + '</td>' +
+                '<td style="font-size:11px;color:#64748b;">' + timeHtml + '</td>';
+            tbody.appendChild(tr);
+        });
+    }
+    if (tbody.children.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:40px;">Chưa có SV đăng ký hoạt động này.</td></tr>';
+    }
+    openModal('diemDanhModal');
+}
+
+var ddPopupMaSV = '';
+function hienThiPopup(el) {
+    var popup = document.getElementById('ddStatusPopup');
+    var rect = el.getBoundingClientRect();
+    popup.style.top = (rect.bottom + 6) + 'px';
+    popup.style.left = Math.max(10, rect.left - 20) + 'px';
+    ddPopupMaSV = el.getAttribute('data-masv');
+    document.getElementById('dd_popup_masv').value = ddPopupMaSV;
+    popup.style.display = 'block';
+}
+
+function chonTrangThai(status) {
+    document.getElementById('ddStatusPopup').style.display = 'none';
+    var maSV = document.getElementById('dd_popup_masv').value;
+    if (!maSV) return;
+    // Tìm dòng và cập nhật badge
+    var rows = document.querySelectorAll('#dd_student_list tr');
+    for (var i = 0; i < rows.length; i++) {
+        var badge = rows[i].querySelector('.dd-status-badge');
+        if (!badge) continue;
+        if (badge.getAttribute('data-masv') === maSV) {
+            rows[i].setAttribute('data-status', status);
+            if (status === 'DaThamGia') {
+                badge.style.background = '#dcfce7'; badge.style.color = '#166534';
+                badge.innerHTML = '✅ Đã tham gia ▾';
+            } else if (status === 'KhongThamGia') {
+                badge.style.background = '#fee2e2'; badge.style.color = '#991b1b';
+                badge.innerHTML = '❌ Không tham gia ▾';
+            } else {
+                badge.style.background = '#fef3c7'; badge.style.color = '#92400e';
+                badge.innerHTML = '⏳ Đang chờ xét duyệt ▾';
+            }
+            break;
+        }
+    }
+}
+
+// Đóng popup khi click ra ngoài
+document.addEventListener('click', function(e) {
+    var popup = document.getElementById('ddStatusPopup');
+    if (popup.style.display !== 'none' && !popup.contains(e.target) && !e.target.closest('.dd-status-badge')) {
+        popup.style.display = 'none';
+    }
+});
+
+// Xử lý submit form điểm danh -> gom dữ liệu JSON
+var ddForm = document.getElementById('diemDanhForm');
+if (ddForm) ddForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var ds = [];
+    var rows = document.querySelectorAll('#dd_student_list tr');
+    rows.forEach(function(row) {
+        var badge = row.querySelector('.dd-status-badge');
+        if (!badge) return;
+        var maSV = badge.getAttribute('data-masv');
+        var status = row.getAttribute('data-status') || 'DangCho';
+        ds.push({MaSV: maSV, TrangThai: status});
+    });
+    document.getElementById('dd_data').value = JSON.stringify(ds);
+    this.submit();
+});
+
+function openAddStudentModal(maHD, tenHD) {
+    document.getElementById('display_TenHD').innerText = tenHD;
+    document.getElementById('modal_Student_MaHD').value = maHD;
+    document.querySelectorAll('.sv-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('filterInput').value = '';
+    filterStudents();
+    openModal('addStudentModal');
+}
+
+function openDetailModal(maHD, tenHD) {
+    document.getElementById('detail_TenHD').innerText = tenHD;
+    document.getElementById('detail_Content').innerHTML = document.getElementById('ds_sv_' + maHD).innerHTML;
+    openModal('detailModal');
+}
+
+var filterTimeout = null;
+function filterStudents() {
+    clearTimeout(filterTimeout);
+    var inputEl = document.getElementById('filterInput');
+    filterTimeout = setTimeout(function() {
+        var input = inputEl.value.toLowerCase().trim();
+        var rows = document.querySelectorAll('.sv-row');
+        if (input === '') { rows.forEach(function(r) { r.style.display = ''; }); return; }
+        rows.forEach(function(row) {
+            var text = row.innerText.toLowerCase();
+            row.style.display = text.includes(input) ? '' : 'none';
+        });
+    }, 300);
+}
+
+function toggleAll(source) {
+    document.querySelectorAll('.sv-checkbox').forEach(function(cb) {
+        if(cb.closest('tr').style.display !== 'none') { cb.checked = source.checked; }
+    });
+}
+</script>
+{% endblock %}

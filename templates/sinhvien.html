@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+
+{% block title %}Quản lý Sinh viên{% endblock %}
+{% block page_title %}QUẢN LÝ SINH VIÊN{% endblock %}
+{% block page_subtitle %}Xem, tìm kiếm và cập nhật thông tin sinh viên toàn khoa.{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <form class="flex items-center gap-2 flex-wrap" method="GET" action="/sinh-vien">
+            <input type="text" name="search_query" class="form-control search-input" placeholder="Tìm tên, mã SV hoặc lớp..." value="{{ search_query }}">
+            <select name="class_filter" class="form-control filter-select">
+                <option value="">-- Tất cả lớp --</option>
+                {% for c in classes %}
+                    <option value="{{ c.TenLop }}" {% if class_filter == c.TenLop %}selected{% endif %}>{{ c.TenLop }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary">🔍 Tìm</button>
+            {% if search_query or class_filter %}
+                <a href="/sinh-vien" class="btn btn-secondary">❌ Bỏ lọc</a>
+            {% endif %}
+        </form>
+    </div>
+    <div class="toolbar-right">
+        {% if session.get('role') != 'sinhvien' %}
+        <a href="/export/sinh-vien" class="btn btn-success">📥 Xuất Excel</a>
+        <button class="btn btn-warning" onclick="document.getElementById('importSVModal').style.display='flex'">📥 Nhập Excel</button>
+        {% endif %}
+        {% if session.role == 'admin' %}
+        <button class="btn btn-primary" onclick="openAddModal()">➕ Thêm SV</button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="table-card">
+    <div class="table-wrap">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>STT</th>
+                    <th>Mã SV</th>
+                    <th>Họ và Tên</th>
+                    <th>Lớp</th>
+                    <th>Ngày Sinh</th>
+                    <th>SĐT</th>
+                    <th>Email</th>
+                    <th>Đảng viên</th>
+                    <th>Trạng thái</th>
+                    {% if session.role == 'admin' %}
+                    <th class="text-center">Thao tác</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for sv in students %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><span class="badge badge-gray">{{ sv.MaSV }}</span></td>
+                    <td><strong>{{ sv.HoLotSV }} {{ sv.TenSV }}</strong></td>
+                    <td>{{ sv.TenLop }}</td>
+                    <td>{{ sv.NgaySinh }}</td>
+                    <td>{{ sv.SDT }}</td>
+                    <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;">{{ sv.Email }}</td>
+                    <td>
+                        {% if sv.LaDangVien == 1 or sv.LaDangVien == '1' %}
+                            <span class="badge badge-green">Có</span>
+                        {% else %}
+                            <span class="badge badge-gray">Không</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if sv.TrangThai == 'Đang học' %}
+                            <span class="badge badge-green">{{ sv.TrangThai }}</span>
+                        {% else %}
+                            <span class="badge badge-gray">{{ sv.TrangThai }}</span>
+                        {% endif %}
+                    </td>
+                    {% if session.role == 'admin' %}
+                    <td class="text-center">
+                        <button class="btn-icon edit-btn" title="Sửa"
+                            data-masv="{{ sv.MaSV }}" data-holot="{{ sv.HoLotSV }}"
+                            data-tensv="{{ sv.TenSV }}" data-tenlop="{{ sv.TenLop }}"
+                            data-malop="{{ sv.MaLop }}" data-ngaysinh="{{ sv.NgaySinh }}"
+                            data-sdt="{{ sv.SDT }}" data-email="{{ sv.Email }}"
+                            data-quequan="{{ sv.QueQuan }}"
+                            data-dangvien="{{ sv.LaDangVien }}"
+                            data-trangthai="{{ sv.TrangThai }}"
+                            onclick="openEditModal(this)">✏️</button>
+                        <button class="btn-icon" title="Xóa" onclick="openDeleteModal('{{ sv.MaSV }}')">🗑️</button>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="{% if session.role == 'admin' %}10{% else %}9{% endif %}" class="text-center" style="padding:40px;color:var(--text-muted);">
+                        Không tìm thấy sinh viên nào.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Thêm/Sửa SV -->
+<div id="studentModal" class="modal-overlay">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <h3 id="modal_title">Thông tin Sinh viên</h3>
+            <button class="close-btn" onclick="closeModal('studentModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form class="grid-form" id="studentForm" method="POST" action="/luu-sinh-vien">
+                <input type="hidden" id="form_action" name="action" value="add">
+                <input type="hidden" id="old_MaSV" name="old_MaSV" value="">
+                <div class="form-group"><label>Mã SV</label><input type="text" id="modal_MaSV" name="MaSV" required></div>
+                <div class="form-group"><label>Họ lót</label><input type="text" id="modal_HoLotSV" name="HoLotSV" required></div>
+                <div class="form-group"><label>Tên SV</label><input type="text" id="modal_TenSV" name="TenSV" required></div>
+                <div class="form-group"><label>Tên Lớp</label><input type="text" id="modal_TenLop" name="TenLop"></div>
+                <div class="form-group"><label>Mã Lớp</label><input type="text" id="modal_MaLop" name="MaLop"></div>
+                <div class="form-group"><label>Ngày Sinh</label><input type="date" id="modal_NgaySinh" name="NgaySinh"></div>
+                <div class="form-group"><label>SĐT</label><input type="text" id="modal_SDT" name="SDT"></div>
+                <div class="form-group"><label>Email</label><input type="email" id="modal_Email" name="Email"></div>
+                <div class="form-group full-width"><label>Quê Quán</label><input type="text" id="modal_QueQuan" name="QueQuan"></div>
+                <div class="form-group">
+                    <label>Đảng viên</label>
+                    <select id="modal_LaDangVien" name="LaDangVien">
+                        <option value="0">Không</option>
+                        <option value="1">Có</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Trạng thái</label>
+                    <select id="modal_TrangThai" name="TrangThai">
+                        <option value="Đang học">Đang học</option>
+                        <option value="Đã tốt nghiệp">Đã tốt nghiệp</option>
+                        <option value="Bảo lưu">Bảo lưu</option>
+                    </select>
+                </div>
+                <div class="full-width flex items-center justify-between" style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('studentModal')">Hủy</button>
+                    <button type="submit" class="btn btn-primary">💾 Lưu thông tin</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xác nhận Xóa -->
+<div id="deleteModal" class="modal-overlay">
+    <div class="modal-content modal-sm text-center">
+        <div class="modal-body" style="padding:40px 24px;">
+            <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+            <h3 style="margin-bottom:8px;">Xác nhận xóa?</h3>
+            <p style="color:var(--text-muted);font-size:13px;">Sinh viên này sẽ bị xóa vĩnh viễn khỏi hệ thống.</p>
+        </div>
+        <div class="modal-footer" style="display:flex;gap:12px;justify-content:center;padding:0 24px 24px;">
+            <button class="btn btn-secondary" onclick="closeModal('deleteModal')">Hủy</button>
+            <a href="#" id="confirmDeleteBtn" class="btn btn-danger">Xác nhận Xóa</a>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Import Excel -->
+<div id="importSVModal" class="modal-overlay">
+    <div class="modal-content modal-sm">
+        <div class="modal-header">
+            <h3>📥 Import Sinh viên từ Excel</h3>
+            <button class="close-btn" onclick="document.getElementById('importSVModal').style.display='none'">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p style="color:var(--text-muted);margin-bottom:12px;">Chọn file Excel (.xlsx) với các cột: MaSV, HoLotSV, TenSV, TenLop, NgaySinh, SDT, Email, LaDangVien, TrangThai</p>
+            <form method="POST" action="/import/sinh-vien" enctype="multipart/form-data">
+                <input type="file" name="file" accept=".xlsx" class="form-control" required>
+                <div class="flex items-center justify-between" style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('importSVModal').style.display='none'">Hủy</button>
+                    <button type="submit" class="btn btn-primary">📤 Tải lên</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+function openAddModal() {
+    document.getElementById('form_action').value = 'add';
+    document.getElementById('modal_title').innerText = 'Thêm Sinh viên mới';
+    document.getElementById('studentForm').reset();
+    openModal('studentModal');
+}
+
+function openEditModal(btn) {
+    document.getElementById('form_action').value = 'edit';
+    document.getElementById('modal_title').innerText = 'Sửa thông tin Sinh viên';
+    document.getElementById('old_MaSV').value = btn.getAttribute('data-masv');
+    document.getElementById('modal_MaSV').value = btn.getAttribute('data-masv');
+    document.getElementById('modal_HoLotSV').value = btn.getAttribute('data-holot');
+    document.getElementById('modal_TenSV').value = btn.getAttribute('data-tensv');
+    document.getElementById('modal_TenLop').value = btn.getAttribute('data-tenlop');
+    document.getElementById('modal_MaLop').value = btn.getAttribute('data-malop');
+    var ns = btn.getAttribute('data-ngaysinh');
+    document.getElementById('modal_NgaySinh').value = (ns && ns !== 'None') ? ns : '';
+    document.getElementById('modal_SDT').value = (btn.getAttribute('data-sdt') !== 'None') ? btn.getAttribute('data-sdt') : '';
+    document.getElementById('modal_Email').value = (btn.getAttribute('data-email') !== 'None') ? btn.getAttribute('data-email') : '';
+    document.getElementById('modal_QueQuan').value = (btn.getAttribute('data-quequan') !== 'None') ? btn.getAttribute('data-quequan') : '';
+    document.getElementById('modal_LaDangVien').value = (btn.getAttribute('data-dangvien') === '1') ? '1' : '0';
+    var tt = btn.getAttribute('data-trangthai');
+    if (tt && tt !== 'None') document.getElementById('modal_TrangThai').value = tt;
+    openModal('studentModal');
+}
+
+function openDeleteModal(masv) {
+    document.getElementById('confirmDeleteBtn').href = '/xoa-sinh-vien/' + masv;
+    openModal('deleteModal');
+}
+</script>
+{% endblock %}

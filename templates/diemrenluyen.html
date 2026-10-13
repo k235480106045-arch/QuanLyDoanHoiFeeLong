@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+
+{% block title %}Điểm Rèn Luyện{% endblock %}
+{% block page_title %}ĐIỂM RÈN LUYỆN{% endblock %}
+{% block page_subtitle %}Tổng hợp, phân loại và xếp hạng ĐRL sinh viên theo kỳ học.{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        {% if session.get('role') != 'sinhvien' %}
+        <a href="/export/diem-ren-luyen?HocKy={{ hoc_ky }}&NamHoc={{ nam_hoc }}" class="btn btn-success" style="margin-right:8px;">📥 Xuất Excel</a>
+        <button class="btn btn-warning" style="margin-right:8px;" onclick="document.getElementById('importDRLModal').style.display='flex'">📥 Nhập Excel</button>
+        {% endif %}
+        <form class="flex items-center gap-2 flex-wrap" method="GET" action="/diem-ren-luyen">
+            <select name="HocKy" class="form-control filter-select">
+                <option value="HK1" {% if hoc_ky == 'HK1' %}selected{% endif %}>HK1</option>
+                <option value="HK2" {% if hoc_ky == 'HK2' %}selected{% endif %}>HK2</option>
+                <option value="HK3" {% if hoc_ky == 'HK3' %}selected{% endif %}>HK3</option>
+            </select>
+            <input type="text" name="NamHoc" class="form-control filter-select" placeholder="VD: 2025-2026" value="{{ nam_hoc }}" style="width:110px;">
+            <select name="XepLoai" class="form-control filter-select">
+                <option value="">-- Xếp loại --</option>
+                <option value="XuatSac" {% if xep_loai == 'XuatSac' %}selected{% endif %}>Xuất sắc (>=90)</option>
+                <option value="Tot" {% if xep_loai == 'Tot' %}selected{% endif %}>Tốt (80-89)</option>
+                <option value="Kha" {% if xep_loai == 'Kha' %}selected{% endif %}>Khá (65-79)</option>
+                <option value="TrungBinh" {% if xep_loai == 'TrungBinh' %}selected{% endif %}>Trung bình (50-64)</option>
+                <option value="YeuKem" {% if xep_loai == 'YeuKem' %}selected{% endif %}>Yếu/Kém (&lt;50)</option>
+            </select>
+             <input type="text" name="search_query" class="form-control search-input" placeholder="Mã SV / Tên / Lớp..." value="{{ search_query }}">
+            <button type="submit" class="btn btn-primary">🔍 Lọc</button>
+            {% if xep_loai or search_query %}
+                <a href="/diem-ren-luyen" class="btn btn-secondary">❌ Bỏ lọc</a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+{% if view_mode == 'lop' %}
+<div class="table-card">
+    <div class="table-wrap">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>STT</th>
+                    <th>Tên Lớp</th>
+                    <th>Sĩ số</th>
+                    <th class="text-center">Bảng điểm</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lop in danh_sach %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><strong style="color:var(--primary);font-size:15px;">{{ lop.TenLop }}</strong></td>
+                    <td><span class="badge badge-gray">{{ lop.SiSo }} SV</span></td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-info" onclick='openClassModal("{{ lop.TenLop }}", {{ diem_dict.get(lop.TenLop, [])|tojson }})'>
+                            📊 Xem bảng điểm
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-center" style="padding:40px;color:var(--text-muted);">Không tìm thấy lớp học nào.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% elif view_mode == 'sinh_vien' %}
+<div class="table-card">
+    <div class="table-wrap">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>Mã SV</th>
+                    <th>Họ và Tên</th>
+                    <th>Lớp</th>
+                    <th>Điểm ({{ hoc_ky }})</th>
+                    <th>Xếp loại</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sv in danh_sach %}
+                <tr>
+                    <td><span class="badge badge-gray">{{ sv.MaSV }}</span></td>
+                    <td><strong>{{ sv.HoLotSV }} {{ sv.TenSV }}</strong></td>
+                    <td>{{ sv.TenLop }}</td>
+                    <td><strong style="color:var(--success);font-size:16px;">{{ sv.Diem }}</strong></td>
+                    <td>
+                        {% if sv.Diem >= 90 %}<span class="badge badge-green">Xuất sắc</span>
+                        {% elif sv.Diem >= 80 %}<span class="badge badge-primary">Tốt</span>
+                        {% elif sv.Diem >= 65 %}<span class="badge badge-info">Khá</span>
+                        {% elif sv.Diem >= 50 %}<span class="badge badge-warning">Trung bình</span>
+                        {% else %}<span class="badge badge-danger">Yếu/Kém</span>{% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-center" style="padding:40px;color:var(--text-muted);">Không có SV nào đạt xếp loại này.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Modal Import Excel -->
+<div id="importDRLModal" class="modal-overlay">
+    <div class="modal-content modal-sm">
+        <div class="modal-header">
+            <h3>📥 Import Điểm RL từ Excel</h3>
+            <button class="close-btn" onclick="document.getElementById('importDRLModal').style.display='none'">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p style="color:var(--text-muted);margin-bottom:12px;">Chọn file Excel (.xlsx) với các cột: MaSV, Diem</p>
+            <form method="POST" action="/import/diem-ren-luyen" enctype="multipart/form-data">
+                <div class="grid-form" style="margin-bottom:12px;">
+                    <div class="form-group"><label>Học kỳ</label>
+                        <select name="HocKy" class="form-control">
+                            <option value="HK1" {% if hoc_ky == 'HK1' %}selected{% endif %}>HK1</option>
+                            <option value="HK2" {% if hoc_ky == 'HK2' %}selected{% endif %}>HK2</option>
+                            <option value="HK3" {% if hoc_ky == 'HK3' %}selected{% endif %}>HK3</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Năm học</label>
+                        <input type="text" name="NamHoc" class="form-control" placeholder="VD: 2025-2026" value="{{ nam_hoc }}">
+                    </div>
+                </div>
+                <input type="file" name="file" accept=".xlsx" class="form-control" required>
+                <div class="flex items-center justify-between" style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('importDRLModal').style.display='none'">Hủy</button>
+                    <button type="submit" class="btn btn-primary">📤 Tải lên</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Bảng điểm lớp -->
+<div id="classScoreModal" class="modal-overlay">
+    <div class="modal-content modal-lg" style="max-width:850px;">
+        <div class="modal-header">
+            <h3>Bảng điểm rèn luyện: <span id="display_TenLop" style="color:#d97706;"></span></h3>
+            <button class="close-btn" onclick="document.getElementById('classScoreModal').style.display='none'">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="alert alert-info">{{ hoc_ky }} - Năm học {{ nam_hoc }}</div>
+            <div class="score-table-wrap">
+                <table class="modern-table">
+                    <thead>
+                        <tr><th>Mã SV</th><th>Họ Tên</th><th>Điểm</th><th>Xếp loại</th>
+                            {% if session.get('role') in ['admin', 'bch'] %}
+                            <th>Cập nhật</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody id="studentScoreList"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openClassModal(tenLop, dsSinhVien) {
+    document.getElementById('display_TenLop').innerText = tenLop;
+    var tbody = document.getElementById('studentScoreList');
+    tbody.innerHTML = '';
+    var hocKy = "{{ hoc_ky }}";
+    var namHoc = "{{ nam_hoc }}";
+    var canEdit = {{ 'true' if session.get('role') in ['admin', 'bch'] else 'false' }};
+
+    dsSinhVien.forEach(function(sv) {
+        var badgeClass = "badge-gray";
+        if (sv.XepLoai === "Xuất sắc") badgeClass = "badge-green";
+        else if (sv.XepLoai === "Tốt") badgeClass = "badge-primary";
+        else if (sv.XepLoai === "Khá") badgeClass = "badge-info";
+        else if (sv.XepLoai === "Trung bình") badgeClass = "badge-warning";
+        else badgeClass = "badge-danger";
+
+        var editCol = '';
+        if (canEdit) {
+            editCol = '<td><form method="POST" action="/cap-nhat-diem" style="display:flex;gap:4px;">' +
+                '<input type="hidden" name="MaSV" value="' + sv.MaSV + '">' +
+                '<input type="hidden" name="HocKy" value="' + hocKy + '">' +
+                '<input type="hidden" name="NamHoc" value="' + namHoc + '">' +
+                '<input type="number" name="Diem" value="' + sv.Diem + '" class="form-control" style="width:70px;height:30px;font-size:12px;" required>' +
+                '<button type="submit" class="btn btn-sm btn-warning">Lưu</button></form></td>';
+        }
+
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td><span class="badge badge-gray">' + sv.MaSV + '</span></td>' +
+            '<td><strong>' + sv.HoLotSV + ' ' + sv.TenSV + '</strong></td>' +
+            '<td><strong style="color:var(--success);font-size:15px;">' + sv.Diem + '</strong></td>' +
+            '<td><span class="badge ' + badgeClass + '">' + sv.XepLoai + '</span></td>' +
+            editCol;
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById('classScoreModal').style.display = 'flex';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Lịch sử đăng nhập{% endblock %}
+{% block page_title %}LỊCH SỬ ĐĂNG NHẬP{% endblock %}
+{% block page_subtitle %}Theo dõi các lần đăng nhập vào hệ thống.{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <form class="flex items-center gap-2 flex-wrap" method="GET" action="/lich-su-dang-nhap">
+            <input type="text" name="search" class="form-control search-input" placeholder="Tìm username, IP..." value="{{ search_query or '' }}">
+            <select name="status" class="form-control filter-select">
+                <option value="">-- Trạng thái --</option>
+                <option value="thanh_cong" {% if status_filter == 'thanh_cong' %}selected{% endif %}>✅ Thành công</option>
+                <option value="that_bai" {% if status_filter == 'that_bai' %}selected{% endif %}>❌ Thất bại</option>
+            </select>
+            <button type="submit" class="btn btn-primary">🔍 Lọc</button>
+            {% if search_query or status_filter %}
+                <a href="/lich-su-dang-nhap" class="btn btn-secondary">❌ Bỏ lọc</a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<div class="table-card">
+    <div class="table-wrap">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>STT</th>
+                    <th>Tài khoản</th>
+                    <th>Vai trò</th>
+                    <th>IP</th>
+                    <th>Thiết bị</th>
+                    <th>Trạng thái</th>
+                    <th>Thời gian</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><span class="badge badge-gray">{{ log.username }}</span></td>
+                    <td>
+                        {% if log.vai_tro == 'admin' %}<span class="role-badge admin">Admin</span>
+                        {% elif log.vai_tro == 'bch' %}<span class="role-badge bch">BCH</span>
+                        {% elif log.vai_tro == 'sinhvien' %}<span class="role-badge sinh_vien">SV</span>
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td style="font-size:12px;font-family:monospace;color:#64748b;">{{ log.ip_address }}</td>
+                    <td style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748b;" title="{{ log.user_agent }}">{{ log.user_agent[:60] }}{% if log.user_agent and log.user_agent|length > 60 %}...{% endif %}</td>
+                    <td>
+                        {% if log.trang_thai == 'thanh_cong' %}
+                            <span class="badge badge-green">✅ Thành công</span>
+                        {% elif log.trang_thai == 'that_bai' %}
+                            <span class="badge badge-danger">❌ Thất bại</span>
+                        {% else %}
+                            <span class="badge badge-gray">{{ log.trang_thai }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size:12px;white-space:nowrap;color:#64748b;">{{ log.created_at.strftime('%H:%M %d/%m/%Y') if log.created_at is not string else log.created_at }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-center" style="padding:60px;color:var(--text-muted);">Chưa có lịch sử đăng nhập.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div style="margin-top:12px;font-size:12px;color:var(--text-muted);text-align:right;">
+    Tổng số: <strong>{{ logs|length }}</strong> lần đăng nhập
+</div>
+{% endblock %}

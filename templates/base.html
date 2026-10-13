@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Quản lý{% endblock %} - ĐOÀN HỘI FEE</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+    <div class="app-layout">
+        <!-- SIDEBAR BACKDROP -->
+        <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="document.getElementById('sidebar').classList.remove('open');this.classList.remove('open');"></div>
+        <!-- SIDEBAR -->
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <h2>ĐOÀN - HỘI FEE</h2>
+                <p>Khoa Điện tử - TNUT</p>
+            </div>
+            <div class="sidebar-nav">
+                <a href="/home" class="{% if request.path == '/home' %}active{% endif %}">
+                    <span class="nav-icon">🏠</span> Trang chủ
+                </a>
+                <a href="/sinh-vien" class="{% if request.path == '/sinh-vien' %}active{% endif %}">
+                    <span class="nav-icon">👥</span> Sinh viên
+                </a>
+                <a href="/bch" class="{% if request.path == '/bch' %}active{% endif %}">
+                    <span class="nav-icon">⭐</span> BCH Đoàn - Hội
+                </a>
+                <a href="/hoat-dong" class="{% if request.path == '/hoat-dong' %}active{% endif %}">
+                    <span class="nav-icon">📅</span> Hoạt động
+                </a>
+                <a href="/diem-ren-luyen" class="{% if request.path == '/diem-ren-luyen' %}active{% endif %}">
+                    <span class="nav-icon">📊</span> Điểm rèn luyện
+                </a>
+                <a href="/khen-thuong" class="{% if request.path == '/khen-thuong' %}active{% endif %}">
+                    <span class="nav-icon">🏆</span> Khen thưởng
+                </a>
+                <a href="/truyen-thong" class="{% if request.path == '/truyen-thong' %}active{% endif %}">
+                    <span class="nav-icon">📢</span> Truyền thông
+                </a>
+                {% if session.get('role') == 'admin' %}
+                <a href="/lich-su-dang-nhap" class="{% if request.path == '/lich-su-dang-nhap' %}active{% endif %}">
+                    <span class="nav-icon">🔐</span> Lịch sử đăng nhập
+                </a>
+                {% endif %}
+            </div>
+            <div class="sidebar-footer">
+                <a href="/profile" class="sidebar-user-card">
+                    <div class="user-avatar-lg {{ session.role }}">
+                        {% if session.get('avatar') %}
+                            <img src="{{ url_for('static', filename='avatars/' + session.get('avatar')) }}" alt="Avatar" onerror="this.style.display='none';this.parentNode.innerHTML='{{ session.username[:1] | upper }}'">
+                        {% else %}
+                            {{ session.username[:1] | upper }}
+                        {% endif %}
+                    </div>
+                    <div class="user-detail">
+                        <div class="user-name">{{ session.username }}</div>
+                        <div class="user-role">
+                            <span class="role-dot {{ session.role }}"></span>
+                            {% if session.role == 'admin' %}Admin
+                            {% elif session.role == 'bch' %}BCH
+                            {% else %}Sinh viên{% endif %}
+                        </div>
+                    </div>
+                </a>
+                <a href="/logout">
+                    <span>🚪</span> Đăng xuất
+                </a>
+            </div>
+        </nav>
+
+        <!-- MAIN CONTENT -->
+        <div class="main-content">
+            <header class="top-bar">
+                <button class="toggle-sidebar" onclick="toggleSidebar()">☰</button>
+                <div>
+                    <div class="page-title">
+                        {% block page_title %}Trang chủ{% endblock %}
+                        <span class="page-sub">{% block page_subtitle %}{% endblock %}</span>
+                    </div>
+                </div>
+                <div class="top-actions" style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:13px;color:var(--text-muted);">
+                        Xin chào, <strong>{{ session.username }}</strong>
+                    </span>
+                </div>
+            </header>
+
+            <div class="content-body">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+<!-- Modal Quét QR -->
+<div id="qrScannerModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeQRScanner()">
+    <div class="modal-content modal-sm">
+        <div class="modal-header">
+            <h3>📷 Quét mã QR</h3>
+            <button class="close-btn" onclick="closeQRScanner()">&times;</button>
+        </div>
+        <div class="modal-body" style="text-align:center;">
+            <p style="color:var(--text-muted);margin-bottom:12px;">Đưa mã QR vào khung hình để điểm danh tự động.</p>
+            <div id="qr-reader" style="width:100%;max-width:400px;margin:0 auto;"></div>
+            <div id="qr-result" style="margin-top:12px;font-size:13px;color:var(--text-muted);"></div>
+            <div style="margin-top:16px;">
+                <button class="btn btn-secondary" onclick="closeQRScanner()">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var html5QrCode = null;
+var qrScannerRunning = false;
+
+function toggleSidebar() {
+    var sb = document.getElementById('sidebar');
+    var backdrop = document.getElementById('sidebarBackdrop');
+    sb.classList.toggle('open');
+    backdrop.classList.toggle('open');
+}
+
+function openQRScanner() {
+    document.getElementById('qrScannerModal').style.display = 'flex';
+    document.getElementById('qr-result').innerHTML = '⏳ Đang chờ camera...';
+    if (html5QrCode) { html5QrCode.stop(); html5QrCode = null; }
+    if (typeof Html5Qrcode === 'undefined') {
+        document.getElementById('qr-result').innerHTML = '❌ Thư viện quét QR chưa được tải. Vui lòng thử lại!';
+        return;
+    }
+    setTimeout(function() {
+        try {
+            html5QrCode = new Html5Qrcode("qr-reader");
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                function(qrMessage) {
+                    var match = qrMessage.match(/\/diem-danh-qr\/([^\/\s?#]+)/);
+                    if (match) {
+                        closeQRScanner();
+                        window.location.href = '/diem-danh-qr/' + match[1];
+                    } else {
+                        document.getElementById('qr-result').innerHTML = '❌ Mã QR không hợp lệ!';
+                    }
+                },
+                function(err) { /* scanning... */ }
+            ).then(function() {
+                qrScannerRunning = true;
+                document.getElementById('qr-result').innerHTML = '✅ Camera đã sẵn sàng. Đưa mã QR vào khung.';
+            }).catch(function(err) {
+                document.getElementById('qr-result').innerHTML = '❌ Lỗi camera: ' + err;
+            });
+        } catch(e) {
+            document.getElementById('qr-result').innerHTML = '❌ Lỗi khởi tạo: ' + e;
+        }
+    }, 300);
+}
+
+function closeQRScanner() {
+    document.getElementById('qrScannerModal').style.display = 'none';
+    if (html5QrCode) {
+        try { html5QrCode.stop(); } catch(e) {}
+        html5QrCode = null;
+    }
+    qrScannerRunning = false;
+    var el = document.getElementById('qr-result');
+    if (el) el.innerHTML = '';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% block title %}Truyền thống{% endblock %}
+{% block page_title %}TRUYỀN THÔNG{% endblock %}
+{% block page_subtitle %}Báo cáo, tin tức và bài viết về hoạt động của Đoàn - Hội.{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <a href="/export/truyen-thong" class="btn btn-success" style="margin-right:8px;">📥 Xuất Excel</a>
+        <form class="flex items-center gap-2 flex-wrap" method="GET" action="/truyen-thong">
+            <input type="text" name="search_query" class="form-control search-input" placeholder="Tìm tiêu đề hoặc nội dung..." value="{{ search_query }}">
+            <button type="submit" class="btn btn-primary">🔍 Tìm</button>
+            {% if search_query %}
+            <a href="/truyen-thong" class="btn btn-secondary">❌ Bỏ lọc</a>
+            {% endif %}
+        </form>
+    </div>
+    <div class="toolbar-right">
+        {% if session.get('role') in ['admin', 'bch'] %}
+        <button class="btn btn-primary" onclick="openAddModal()">➕ Thêm bài viết</button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="table-card">
+    <div class="table-wrap">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>Mã bài</th>
+                    <th>Tiêu đề</th>
+                    <th>Ngày đăng</th>
+                    <th>Nội dung</th>
+                    <th>Link</th>
+                    {% if session.get('role') in ['admin', 'bch'] %}
+                    <th>Hành động</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for bv in bai_viet_list %}
+                <tr>
+                    <td><span class="badge badge-gray">{{ bv.MaBaiViet }}</span></td>
+                    <td><strong>{{ bv.TieuDe }}</strong></td>
+                    <td>{{ bv.NgayDang }}</td>
+                    <td style="max-width:280px;">
+                        <span class="text-preview">{{ bv.NoiDung[:100] }}{% if bv.NoiDung|length > 100 %}...{% endif %}</span>
+                    </td>
+                    <td>{% if bv.link_bai_viet %}<a href="{{ bv.link_bai_viet }}" target="_blank">🔗 Link</a>{% else %}—{% endif %}</td>
+                    {% if session.get('role') in ['admin', 'bch'] %}
+                    <td>
+                        <button class="btn btn-sm btn-primary"
+                            data-mabv="{{ bv.MaBaiViet }}" data-tieude="{{ bv.TieuDe }}"
+                            data-noidung="{{ bv.NoiDung }}"
+                            data-ngaydang="{{ bv.NgayDang }}" data-link="{{ bv.link_bai_viet or '' }}"
+                            onclick="openEditModal(this)">✏️ Sửa</button>
+                        <a href="/xoa-bai-viet/{{ bv.MaBaiViet }}" class="btn btn-sm btn-danger" onclick="return confirm('Xóa bài viết này?')">🗑️</a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center" style="padding:40px;color:var(--text-muted);">Chưa có bài viết nào.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Thêm/Sửa -->
+<div id="baivietModal" class="modal-overlay">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <h3 id="bv_modal_title">Thêm bài viết</h3>
+            <button class="close-btn" onclick="closeModal('baivietModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form method="POST" action="/luu-bai-viet">
+                <input type="hidden" id="bv_action" name="action" value="add">
+                <input type="hidden" id="bv_MaBaiViet" name="MaBaiViet">
+                <div class="form-group full-width"><label>Tiêu đề</label><input type="text" id="bv_TieuDe" name="TieuDe" class="form-control" required></div>
+                <div class="grid-form">
+                    <div class="form-group"><label>Ngày đăng</label><input type="date" id="bv_NgayDang" name="NgayDang" class="form-control" required></div>
+                    <div class="form-group"><label>Link bài viết</label><input type="url" id="bv_Link" name="link_bai_viet" class="form-control" placeholder="https://..."></div>
+                </div>
+                <div class="form-group full-width"><label>Nội dung</label><textarea id="bv_NoiDung" name="NoiDung" class="form-control" rows="5" required></textarea></div>
+                <div class="flex items-center justify-between" style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('baivietModal')">Hủy</button>
+                    <button type="submit" class="btn btn-primary">💾 Lưu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+function openAddModal() {
+    document.getElementById('bv_action').value = 'add';
+    document.getElementById('bv_modal_title').innerText = 'Thêm bài viết mới';
+    document.getElementById('baivietModal').querySelector('form').reset();
+    document.getElementById('bv_MaBaiViet').disabled = false;
+    openModal('baivietModal');
+}
+
+function openEditModal(btn) {
+    document.getElementById('bv_action').value = 'edit';
+    document.getElementById('bv_modal_title').innerText = 'Sửa bài viết';
+    document.getElementById('bv_MaBaiViet').value = btn.getAttribute('data-mabv');
+    document.getElementById('bv_MaBaiViet').disabled = true;
+    document.getElementById('bv_TieuDe').value = btn.getAttribute('data-tieude');
+    document.getElementById('bv_NgayDang').value = btn.getAttribute('data-ngaydang');
+    document.getElementById('bv_NoiDung').value = btn.getAttribute('data-noidung');
+    document.getElementById('bv_Link').value = btn.getAttribute('data-link') || '';
+    openModal('baivietModal');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+{% block title %}Khen thưởng{% endblock %}
+{% block page_title %}KHEN THƯỞNG{% endblock %}
+{% block page_subtitle %}Quản lý khen thưởng, tuyên dương sinh viên trong các hoạt động.{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <a href="/export/khen-thuong" class="btn btn-success" style="margin-right:8px;">📥 Xuất Excel</a>
+        <form class="flex items-center gap-2 flex-wrap" method="GET" action="/khen-thuong">
+            <input type="text" name="search_query" class="form-control search-input" placeholder="Mã SV / Tên..." value="{{ search_query }}">
+            <select name="trangthai_filter" class="form-control filter-select">
+                <option value="">-- Trạng thái --</option>
+                <option value="Chờ duyệt" {% if trangthai_filter == 'Chờ duyệt' %}selected{% endif %}>Chờ duyệt</option>
+                <option value="Đã duyệt" {% if trangthai_filter == 'Đã duyệt' %}selected{% endif %}>Đã duyệt</option>
+            </select>
+            <button type="submit" class="btn btn-primary">🔍 Lọc</button>
+            {% if search_query or trangthai_filter %}
+                <a href="/khen-thuong" class="btn btn-secondary">❌ Bỏ lọc</a>
+            {% endif %}
+        </form>
+    </div>
+    <div class="toolbar-right">
+        {% if session.get('role') in ['admin', 'bch'] %}
+        <button class="btn btn-primary" onclick="openAddModal()">🏅 Thêm khen thưởng</button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="table-card">
+    <div class="table-wrap">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>Mã KT</th>
+                    <th>SV</th>
+                    <th>Danh mục</th>
+                    <th>Lý do</th>
+                    <th>Ngày</th>
+                    <th>Trạng thái</th>
+                    {% if session.get('role') in ['admin', 'bch'] %}
+                    <th>Hành động</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for kt in khenthuong_list %}
+                <tr>
+                    <td><span class="badge badge-gray">{{ kt.MaKT }}</span></td>
+                    <td><strong>{{ kt.HoLotSV or '' }} {{ kt.TenSV or '' }}</strong><br><span class="text-muted" style="font-size:11px;">{{ kt.MaSV }}</span></td>
+                    <td>{{ kt.TenDanhMuc or '—' }}</td>
+                    <td>{{ kt.LyDo }}</td>
+                    <td>{{ kt.NgayKhenThuong }}</td>
+                    <td>
+                        {% if kt.TrangThai == 'Đã duyệt' %}<span class="badge badge-green">{{ kt.TrangThai }}</span>
+                        {% elif kt.TrangThai == 'Chờ duyệt' %}<span class="badge badge-warning">{{ kt.TrangThai }}</span>
+                        {% else %}<span class="badge badge-gray">{{ kt.TrangThai }}</span>{% endif %}
+                    </td>
+                    {% if session.get('role') in ['admin', 'bch'] %}
+                    <td>
+                        {% if kt.TrangThai == 'Chờ duyệt' %}
+                        <a href="/duyet-khen-thuong/{{ kt.MaKT }}/Đã duyệt" class="btn btn-sm btn-success">✅ Duyệt</a>
+                        {% endif %}
+                        <a href="/xoa-khen-thuong/{{ kt.MaKT }}" class="btn btn-sm btn-danger" onclick="return confirm('Xóa khen thưởng này?')">🗑️ Xóa</a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-center" style="padding:40px;color:var(--text-muted);">Chưa có khen thưởng nào.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Thêm Khen thưởng -->
+<div id="khenthuongModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>🏅 Đề xuất khen thưởng</h3>
+            <button class="close-btn" onclick="closeModal('khenthuongModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form method="POST" action="/dang-ky-khen-thuong" enctype="multipart/form-data">
+                <div class="form-group"><label>Mã Sinh viên</label><input type="text" name="MaSV" class="form-control" required></div>
+                <div class="form-group"><label>Danh mục khen thưởng</label>
+                    <select name="MaDanhMucKT" class="form-control" required>
+                        <option value="">-- Chọn --</option>
+                        {% for dm in danhmuc_list %}
+                        <option value="{{ dm.MaDanhMucKT }}">{{ dm.TenDanhMuc }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group"><label>Ngày khen thưởng</label><input type="date" name="NgayKhenThuong" class="form-control" required></div>
+                <div class="form-group"><label>Lý do</label><textarea name="LyDo" class="form-control" rows="3" required></textarea></div>
+                <div class="form-group"><label>File minh chứng</label><input type="file" name="FileMinhChung" class="form-control"></div>
+                <div class="flex items-center justify-between" style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('khenthuongModal')">Hủy</button>
+                    <button type="submit" class="btn btn-primary">💾 Gửi đề xuất</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+function openAddModal() {
+    document.getElementById('khenthuongModal').querySelector('form').reset();
+    openModal('khenthuongModal');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng nhập - ĐOÀN HỘI FEE TNUT</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<style>
+.password-wrapper { position:relative; }
+.password-wrapper input { padding-right:40px; }
+.toggle-password {
+    position:absolute; right:12px; top:50%; transform:translateY(-50%);
+    cursor:pointer; user-select:none; font-size:18px; line-height:1; color:#888;
+}
+</style>
+</head>
+<body class="login-body">
+    <div class="login-container">
+        <div class="login-logo">
+            <img src="{{ url_for('static', filename='images/logo_khoa.png') }}" alt="Khoa">
+            <img src="{{ url_for('static', filename='images/logo_doan.png') }}" alt="Đoàn">
+            <img src="{{ url_for('static', filename='images/logo_hoi.png') }}" alt="Hội">
+        </div>
+        <h2>LIÊN CHI ĐOÀN - LIÊN CHI HỘI</h2>
+        <p class="login-subtitle">Khoa Điện tử - Trường Đại học Kỹ thuật Công nghiệp</p>
+
+        {% if error %}
+            <div class="error-msg">{{ error }}</div>
+        {% endif %}
+
+        <form action="/login" method="POST">
+            <div class="form-group">
+                <label>Mã sinh viên / Tài khoản</label>
+                <input type="text" name="username" placeholder="Nhập mã số sinh viên..." required>
+            </div>
+            <div class="form-group">
+                <label>Mật khẩu</label>
+                <div class="password-wrapper">
+                    <input type="password" name="password" placeholder="Nhập mật khẩu..." required>
+                    <span class="toggle-password" onclick="togglePassword(this)">👁</span>
+                </div>
+            </div>
+            <button type="submit">Đăng nhập</button>
+        </form>
+        <div class="login-footer">Hệ thống Quản lý Đoàn - Hội sinh viên Khoa Điện tử</div>
+    </div>
+<script>
+function togglePassword(el) {
+    var input = el.parentElement.querySelector('input');
+    if (input.type === 'password') { input.type = 'text'; el.textContent = '🙈'; }
+    else { input.type = 'password'; el.textContent = '👁'; }
+}
+</script>
+</body>
+</html>

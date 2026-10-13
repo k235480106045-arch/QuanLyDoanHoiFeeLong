@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+
+{% block title %}Trang chủ - ĐOÀN HỘI FEE{% endblock %}
+{% block page_title %}TRANG CHỦ{% endblock %}
+{% block page_subtitle %}Hệ thống Quản lý Đoàn - Hội Khoa Điện tử{% endblock %}
+
+{% block content %}
+<style>
+.home-hero { position: relative; border-radius: var(--radius-xl); overflow: hidden; margin-bottom: 28px; min-height: 160px; display: flex; align-items: flex-end; }
+.home-hero img { width: 100%; height: 100%; min-height: 160px; max-height: 400px; object-fit: cover; display: block; }
+.hero-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 60%); display: flex; flex-direction: column; justify-content: flex-end; padding: 24px; color: white; }
+.hero-overlay h2 { font-size: 24px; font-weight: 800; }
+.hero-overlay p { font-size: 14px; opacity: 0.9; margin-top: 4px; }
+.hero-upload-btn { position: absolute; top: 12px; right: 12px; z-index: 10; }
+.hero-upload-btn label { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: rgba(0,0,0,0.5); color: white; border-radius: 20px; font-size: 12px; cursor: pointer; backdrop-filter: blur(4px); transition: 0.2s; }
+.hero-upload-btn label:hover { background: rgba(0,0,0,0.7); }
+</style>
+
+<div class="home-hero">
+    <img src="{{ url_for('static', filename='images/anh-gioi-thieu.jpg') }}" alt="Tập thể Liên chi đoàn - Liên chi Hội FEE" onerror="this.style.display='none'">
+    <div class="hero-overlay">
+        <h2>Đoàn Thanh niên, Hội Sinh viên</h2>
+        <p>Khoa Điện tử - Trường Đại học Kỹ thuật Công nghiệp</p>
+    </div>
+    {% if session.get('role') in ['admin', 'bch'] %}
+    <div class="hero-upload-btn">
+        <form method="POST" action="/upload-cover" enctype="multipart/form-data" id="coverForm">
+            <label>
+                📷 Thay ảnh bìa
+                <input type="file" name="cover_image" accept="image/*" style="display:none" onchange="document.getElementById('coverForm').submit()">
+            </label>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<div class="intro-section" id="introSection">
+    <h3>📖 Giới thiệu
+        {% if session.get('role') in ['admin', 'bch'] %}
+        <button class="btn btn-sm btn-primary" style="margin-left:12px;font-size:12px;" onclick="openIntroEdit()">✏️ Sửa</button>
+        {% endif %}
+    </h3>
+    <div id="introDisplay">{{ intro_content | safe }}</div>
+</div>
+
+{% if session.get('role') in ['admin', 'bch'] %}
+<div class="post-composer">
+    <div class="composer-top">
+        <div class="user-avatar">{{ session.username[:1] | upper }}</div>
+        <span style="font-weight:600;font-size:14px;">Đăng bài viết mới</span>
+    </div>
+    <form action="/tao-bai-viet" method="POST" enctype="multipart/form-data">
+        <textarea name="noi_dung" placeholder="Bạn muốn thông báo hay chia sẻ nội dung gì đến sinh viên khoa Điện tử hôm nay?..." required></textarea>
+        <div class="composer-actions">
+            <div class="left">
+                <label class="attach-btn">
+                    📷 Đính kèm ảnh
+                    <input type="file" name="hinh_anh" accept="image/*" style="display:none;">
+                </label>
+            </div>
+            <button type="submit" class="btn btn-primary">Đăng bài</button>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+<div class="post-feed">
+    {% for bv in bai_viet_list %}
+    <div class="post-card">
+        <div class="post-header">
+            <div class="post-avatar">{{ session.username[:1] | upper }}</div>
+            <div style="flex:1;">
+                <div class="post-author">Đoàn - Hội FEE</div>
+                <div class="post-date">{{ bv.ngay_tao }}</div>
+            </div>
+            {% if session.get('role') in ['admin', 'bch'] %}
+            <div style="display:flex;gap:6px;">
+                <button class="btn btn-sm btn-primary edit-post-btn" style="font-size:11px;padding:4px 10px;" data-id="{{ bv.id }}">✏️ Sửa</button>
+                <a href="/xoa-bai-viet-trang-chu/{{ bv.id }}" class="btn btn-sm btn-danger" style="font-size:11px;padding:4px 10px;" onclick="return confirm('Xóa bài viết này?')">🗑️ Xóa</a>
+            </div>
+            {% endif %}
+        </div>
+        <div class="post-content">{{ bv.noi_dung }}</div>
+        {% if bv.hinh_anh %}
+        <div class="post-image">
+            <img src="{{ url_for('static', filename='images/uploads/' + bv.hinh_anh) }}" alt="Post image" onclick="toggleFullImage(this)">
+            {% if session.get('role') in ['admin', 'bch'] %}
+            <a href="/xoa-anh-bai-viet-trang-chu/{{ bv.id }}" class="btn btn-sm btn-danger" style="position:absolute;top:8px;right:8px;font-size:11px;padding:4px 10px;opacity:0.8;" onclick="return confirm('Xóa ảnh này?')">🗑️ Xóa ảnh</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">📝</div>
+        <h4>Chưa có bài viết nào</h4>
+        <p>Hãy là người đầu tiên đăng bài viết lên trang chủ!</p>
+    </div>
+    {% endfor %}
+</div>
+<!-- Modal Sửa bài viết -->
+<div id="editPostModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>✏️ Sửa bài viết</h3>
+            <button class="close-btn" onclick="document.getElementById('editPostModal').style.display='none'">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="editPostForm" method="POST" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label>Nội dung</label>
+                    <textarea name="noi_dung" id="editPostContent" style="width:100%;min-height:150px;padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Ảnh đính kèm</label>
+                    <input type="file" name="hinh_anh" accept="image/*" class="form-control">
+                    <p style="font-size:12px;color:var(--text-muted);margin-top:4px;">Để trống nếu muốn giữ ảnh cũ.</p>
+                </div>
+                <div class="flex items-center justify-between" style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('editPostModal').style.display='none'">Hủy</button>
+                    <button type="submit" class="btn btn-primary">💾 Lưu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Sửa Giới thiệu -->
+<div id="introModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>✏️ Sửa nội dung Giới thiệu</h3>
+            <button class="close-btn" onclick="document.getElementById('introModal').style.display='none'">&times;</button>
+        </div>
+        <div class="modal-body">
+            <textarea id="introEditor" style="width:100%;min-height:200px;padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;line-height:1.6;">{{ intro_content }}</textarea>
+            <div class="flex items-center justify-between" style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px;">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('introModal').style.display='none'">Hủy</button>
+                <button class="btn btn-primary" onclick="saveIntro()">💾 Lưu</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleFullImage(img) {
+    img.classList.toggle('fullscreen');
+    document.body.style.overflow = img.classList.contains('fullscreen') ? 'hidden' : '';
+}
+document.addEventListener('click', function(e) {
+    if (e.target.classList && e.target.classList.contains('fullscreen')) {
+        e.target.classList.remove('fullscreen');
+        document.body.style.overflow = '';
+    }
+});
+function openIntroEdit() {
+    document.getElementById('introEditor').value = document.getElementById('introDisplay').innerHTML;
+    document.getElementById('introModal').style.display = 'flex';
+}
+function saveIntro() {
+    var content = document.getElementById('introEditor').value;
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/intro', true);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            document.getElementById('introDisplay').innerHTML = content;
+            document.getElementById('introModal').style.display = 'none';
+        } else {
+            alert('Lỗi: ' + xhr.responseText);
+        }
+    };
+    xhr.send('content=' + encodeURIComponent(content));
+}
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.edit-post-btn');
+    if (!btn) return;
+    var postCard = btn.closest('.post-card');
+    var noiDung = postCard.querySelector('.post-content').textContent;
+    document.getElementById('editPostContent').value = noiDung;
+    document.getElementById('editPostForm').action = '/sua-bai-viet-trang-chu/' + btn.dataset.id;
+    document.getElementById('editPostModal').style.display = 'flex';
+});
+</script>
+{% endblock %}

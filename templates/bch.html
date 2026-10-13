@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+{% block title %}Ban Chấp Hành{% endblock %}
+{% block page_title %}BAN CHẤP HÀNH{% endblock %}
+{% block page_subtitle %}Quản lý danh sách BCH Đoàn - Hội, phân công nhiệm vụ.{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <a href="/export/bch" class="btn btn-success" style="margin-right:8px;">📥 Xuất Excel</a>
+        {% if session.get('role') in ['admin', 'bch'] %}
+        <button class="btn btn-warning" style="margin-right:8px;" onclick="document.getElementById('importBCHModal').style.display='flex'">📥 Nhập Excel</button>
+        {% endif %}
+        <form class="flex items-center gap-2 flex-wrap" method="GET" action="/bch">
+            <input type="text" name="search_query" class="form-control search-input" placeholder="Tìm tên hoặc mã BCH..." value="{{ search_query }}">
+            <select name="chucvu_filter" class="form-control filter-select">
+                <option value="">-- Chức vụ --</option>
+                {% for cv in chucvu_list %}
+                    <option value="{{ cv.MaChucVu }}" {% if chucvu_filter == cv.MaChucVu %}selected{% endif %}>{{ cv.MaChucVu }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary">🔍 Tìm</button>
+            {% if search_query or chucvu_filter %}
+            <a href="/bch" class="btn btn-secondary">❌ Bỏ lọc</a>
+            {% endif %}
+        </form>
+    </div>
+    <div class="toolbar-right">
+        {% if session.get('role') in ['admin'] %}
+        <button class="btn btn-primary" onclick="openAddModal()">➕ Thêm BCH</button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="table-card">
+    <div class="table-wrap">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>Mã BCH</th>
+                    <th>Họ và Tên</th>
+                    <th>Chức vụ</th>
+                    <th>Mã SV</th>
+                    <th>Giáo viên</th>
+                    <th>SĐT</th>
+                    {% if session.get('role') in ['admin'] %}
+                    <th>Hành động</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for bch in bch_list %}
+                <tr>
+                    <td><span class="badge badge-gray">{{ bch.MaBCH }}</span></td>
+                    <td><strong>{{ bch.HoLotSV or '' }} {{ bch.TenSV or '' }}{{ bch.TenGiaoVien or '' }}</strong></td>
+                    <td><span class="badge badge-primary">{{ bch.MaChucVu }}</span></td>
+                    <td>{{ bch.MaSV or '—' }}</td>
+                    <td>{{ bch.TenGiaoVien or '—' }}</td>
+                    <td>{{ bch.SDT or '—' }}</td>
+                    {% if session.get('role') in ['admin'] %}
+                    <td>
+                        <button class="btn btn-sm btn-primary"
+                            data-mabch="{{ bch.MaBCH }}" data-masv="{{ bch.MaSV or '' }}"
+                            data-chucvu="{{ bch.MaChucVu }}" data-holot="{{ bch.HoLotSV or '' }}"
+                            data-ten="{{ bch.TenSV or '' }}" data-giaovien="{{ bch.TenGiaoVien or '' }}"
+                            data-sdt="{{ bch.SDT or '' }}" data-email="{{ bch.Email or '' }}"
+                            data-nhiemky="{{ bch.NhiemKy or '' }}"
+                            onclick="openEditModal(this)">✏️ Sửa</button>
+                        <a href="/xoa-bch/{{ bch.MaBCH }}" class="btn btn-sm btn-danger" onclick="return confirm('Xóa BCH này?')">🗑️ Xóa</a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="text-center" style="padding:40px;color:var(--text-muted);">Chưa có BCH nào.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Import Excel -->
+<div id="importBCHModal" class="modal-overlay">
+    <div class="modal-content modal-sm">
+        <div class="modal-header">
+            <h3>📥 Import BCH từ Excel</h3>
+            <button class="close-btn" onclick="document.getElementById('importBCHModal').style.display='none'">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p style="color:var(--text-muted);margin-bottom:12px;">Chọn file Excel (.xlsx) với các cột: MaSV, TenGiaoVien, MaChucVu, Ky, SDT</p>
+            <form method="POST" action="/import/bch" enctype="multipart/form-data">
+                <input type="file" name="file" accept=".xlsx" class="form-control" required>
+                <div class="flex items-center justify-between" style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('importBCHModal').style.display='none'">Hủy</button>
+                    <button type="submit" class="btn btn-primary">📤 Tải lên</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Thêm/Sửa BCH -->
+<div id="bchModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="bch_modal_title">Thêm BCH</h3>
+            <button class="close-btn" onclick="closeModal('bchModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form method="POST" action="/luu-bch">
+                <input type="hidden" id="bch_action" name="action" value="add">
+                <input type="hidden" id="bch_MaBCH" name="MaBCH">
+                <div class="grid-form">
+                    <div class="form-group"><label>Mã SV (nếu là SV)</label><input type="text" id="bch_MaSV" name="MaSV" class="form-control"></div>
+                    <div class="form-group"><label>Tên giáo viên</label><input type="text" id="bch_TenGiaoVien" name="TenGiaoVien" class="form-control"></div>
+                </div>
+                <div class="form-group"><label>Chức vụ</label>
+                    <select id="bch_MaChucVu" name="MaChucVu" class="form-control">
+                        <option value="BT">Bí thư</option>
+                        <option value="PBT">Phó bí thư</option>
+                        <option value="UVBTV">Ủy viên BTV</option>
+                        <option value="LCHT">Liên chi hội trưởng</option>
+                        <option value="LCHP">Liên chi hội phó</option>
+                        <option value="UYBTK">Ủy viên ban thư ký</option>
+                        <option value="UVBCHLCĐ">Ủy viên BCH Liên chi Đoàn</option>
+                        <option value="UVBCHLCH">Ủy viên BCH Liên chi Hội</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Nhiệm kỳ</label><input type="text" id="bch_NhiemKy" name="NhiemKy" class="form-control" placeholder="VD: 2024-2026"></div>
+                <div class="grid-form">
+                    <div class="form-group"><label>SĐT</label><input type="text" id="bch_SDT" name="SDT" class="form-control"></div>
+                    <div class="form-group"><label>Email</label><input type="email" id="bch_Email" name="Email" class="form-control"></div>
+                </div>
+                <div class="flex items-center justify-between" style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('bchModal')">Hủy</button>
+                    <button type="submit" class="btn btn-primary">💾 Lưu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+function openAddModal() {
+    document.getElementById('bch_action').value = 'add';
+    document.getElementById('bch_modal_title').innerText = 'Thêm BCH';
+    document.getElementById('bchModal').querySelector('form').reset();
+    openModal('bchModal');
+}
+
+function openEditModal(btn) {
+    document.getElementById('bch_action').value = 'edit';
+    document.getElementById('bch_modal_title').innerText = 'Sửa BCH';
+    document.getElementById('bch_MaBCH').value = btn.getAttribute('data-mabch');
+    document.getElementById('bch_MaSV').value = btn.getAttribute('data-masv');
+    document.getElementById('bch_TenGiaoVien').value = btn.getAttribute('data-giaovien');
+    document.getElementById('bch_MaChucVu').value = btn.getAttribute('data-chucvu');
+    document.getElementById('bch_SDT').value = btn.getAttribute('data-sdt');
+    document.getElementById('bch_Email').value = btn.getAttribute('data-email');
+    document.getElementById('bch_NhiemKy').value = btn.getAttribute('data-nhiemky') || '';
+    openModal('bchModal');
+}
+</script>
+{% endblock %}
